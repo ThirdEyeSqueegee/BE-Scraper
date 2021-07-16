@@ -26,28 +26,70 @@ class SpiderSpider(scrapy.Spider):
         item_name = item[1]
         # Select the text of all <a> tags -- the name of the company that sells the item
         vendors = response.css("div.listings > ul > li > a::text").getall()
-        described_vendors = []
-        # Mark the vendors which have associated descriptions
-        for vendor in response.css("div.listings > ul > li"):
-            if vendor.css("li::text") != []:
-                described_vendors.append(vendor.css("a::text").get())
+        if len(vendors) != 0:
+            described_vendors = []
+            # Mark the vendors which have associated descriptions
+            for vendor in response.css("div.listings > ul > li"):
+                if vendor.css("li::text") != []:
+                    described_vendors.append(vendor.css("a::text").get())
 
-        # Select all <a> tags by their href attribute -- the URL of the company that
-        # sells the item
-        vendor_links = response.css("div.listings > ul > li > a::attr(href)").getall()
-        vendor_desc = response.css("div.listings > ul > li::text").getall()
-        vendor_desc = [desc[3:] for desc in vendor_desc if desc[1] == "-"]
-        vendor_values = [
-            {"URL": url, "desc": None, "image": None} for url in vendor_links
+            # Select all <a> tags by their href attribute -- the URL of the company that
+            # sells the item
+            vendor_links = response.css(
+                "div.listings > ul > li > a::attr(href)"
+            ).getall()
+            vendor_desc = response.css("div.listings > ul > li::text").getall()
+            vendor_desc = [s for s in vendor_desc if s != "" and s != " " and s != "\n"]
+            vendor_desc = [desc[3:] for desc in vendor_desc if desc[1] == "-"]
+            vendor_values = [
+                {"URL": url, "desc": None, "image": None} for url in vendor_links
+            ]
+
+            # Create a dict by mapping each element of vendors to each member of
+            # vendor_links
+            vendor_dict = dict(zip(vendors, vendor_values))
+
+            # Add descriptions to vendors that have associated descriptions
+            for (k, v) in vendor_dict.items():
+                if k in described_vendors:
+                    if len(vendor_desc) == 0:
+                        break
+                    v["desc"] = vendor_desc.pop(0)
+
+        f_vendors = response.css("div.mfg_div > p > a > strong::text").getall()
+        f_vendor_links = response.css("div.mfg_div > p > a::attr(href)").getall()
+        f_vendor_images = response.css("div.mfg_div img::attr(src)").getall()
+        f_vendor_images = [
+            "https://www.4specs.com" + img_url[5:] for img_url in f_vendor_images
         ]
+        f_vendor_desc = response.css(
+            "div.mfg_div > p::text, div.mfg_div > p > strong::text"
+        ).getall()
 
-        # Create a dict by mapping each element of vendors to each member of vendorlinks
-        vendor_dict = dict(zip(vendors, vendor_values))
+        # Remove duplicates while preserving the order of elements in each list
+        f_vendors = list(dict.fromkeys(f_vendors))
+        f_vendor_links = list(dict.fromkeys(f_vendor_links))
+        f_vendor_images = list(dict.fromkeys(f_vendor_images))
 
-        # Add descriptions to vendors that have associated descriptions
-        for (k, v) in vendor_dict.items():
-            if k in described_vendors:
-                v["desc"] = vendor_desc.pop(0)
+        f_vendor_desc = [s.strip() for s in " ".join(f_vendor_desc).split("\n")]
+
+        if " -  CA, AZ, NV, NM, UT & CO " in f_vendor_desc:
+            f_vendor_desc.remove(" -  CA, AZ, NV, NM, UT & CO ")
+        f_vendor_desc = [s for s in f_vendor_desc if s != ""]
+
+        f_vendor_desc = list(dict.fromkeys(f_vendor_desc))
+
+        f_vendor_dict = {}
+        for i in range(len(f_vendors)):
+            f_vendor_dict[f_vendors[i]] = {}
+            f_vendor_dict[f_vendors[i]]["url"] = f_vendor_links[i]
+            f_vendor_dict[f_vendors[i]]["desc"] = f_vendor_desc[i]
+            f_vendor_dict[f_vendors[i]]["image"] = f_vendor_images[i]
+
+        if len(vendors) == 0:
+            vendor_dict = f_vendor_dict
+        else:
+            vendor_dict |= f_vendor_dict
 
         # yield a dict in the final format that will be saved to a JSON file
         yield {
