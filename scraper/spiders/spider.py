@@ -98,3 +98,42 @@ class SpiderSpider(scrapy.Spider):
             "itemURL": item_url,
             "vendors": vendor_dict,
         }
+
+
+class SweetsSpider(scrapy.Spider):
+    name = "sweets_spider"
+    allowed_domains = ["sweets.construction.com"]
+    start_urls = ["https://sweets.construction.com"]
+
+    def parse(self, response):
+        products = "https://sweets.construction.com/BrowseByDivision"
+        yield scrapy.Request(products, callback=self.parse_divisions)
+
+    def parse_divisions(self, response):
+        div_links = response.css("td.col-1 > a::attr(href)").getall()
+        div_links = ["https://sweets.construction.com" + url for url in div_links]
+        for url in div_links:
+            yield scrapy.Request(url, callback=self.parse_subdivisions)
+
+    def parse_subdivisions(self, response):
+        subdiv_links = response.css("td.col-1 > a::attr(href)").getall()
+        subdiv_links = ["https://sweets.construction.com" + url for url in subdiv_links]
+        for url in subdiv_links:
+            yield scrapy.Request(url, callback=self.parse_products)
+
+    def parse_products(self, response):
+        # TODO: Scrape all pages -- javascript "next page" button is troublesome
+        product_links = response.css("a.product-name::attr(href)").getall()
+        product_links = [
+            "https://sweets.construction.com" + url for url in product_links
+        ]
+        for url in product_links:
+            yield scrapy.Request(url, callback=self.parse_item)
+
+    def parse_item(self, response):
+        manufacturer = response.css("div.productInfo span.company-name::text").get()
+        manufacturer = manufacturer[:-3]
+        name = response.css("div.productInfo > h1.product-name::text").get()
+        # TODO: Scrape description cleanly
+        overview = response.css("div.prd-overview > p:nth-child(1)::text").get()
+        # TODO: Scrape downloadable files
