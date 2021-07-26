@@ -1,8 +1,8 @@
 import scrapy
 
 
-class SpiderSpider(scrapy.Spider):
-    name = "spider"
+class SpecSpider(scrapy.Spider):
+    name = "4specs_spider"
     allowed_domains = ["4specs.com"]
     start_urls = ["http://4specs.com/s/"]
 
@@ -110,30 +110,67 @@ class SweetsSpider(scrapy.Spider):
         yield scrapy.Request(products, callback=self.parse_divisions)
 
     def parse_divisions(self, response):
+        div_names = response.css("td.col-1 > a::text").getall()
+        div_names = [name[11:] for name in div_names]
         div_links = response.css("td.col-1 > a::attr(href)").getall()
         div_links = ["https://sweets.construction.com" + url for url in div_links]
-        for url in div_links:
-            yield scrapy.Request(url, callback=self.parse_subdivisions)
+        divs = dict(zip(div_names, div_links))
 
-    def parse_subdivisions(self, response):
+        for name, url in divs.items():
+            yield scrapy.Request(
+                url, callback=self.parse_subdivisions, cb_kwargs=dict(div=name)
+            )
+
+    def parse_subdivisions(self, response, div):
+        subdiv_names = response.css("td.col-1 > a::text").getall()
+        subdiv_names = [name[11:] for name in subdiv_names]
         subdiv_links = response.css("td.col-1 > a::attr(href)").getall()
         subdiv_links = ["https://sweets.construction.com" + url for url in subdiv_links]
-        for url in subdiv_links:
-            yield scrapy.Request(url, callback=self.parse_products)
+        subdivs = dict(zip(subdiv_names, subdiv_links))
 
-    def parse_products(self, response):
-        # TODO: Scrape all pages -- javascript "next page" button is troublesome
+        for name, url in subdivs.items():
+            yield scrapy.Request(
+                url, callback=self.parse_products, cb_kwargs=dict(div=div, subdiv=name)
+            )
+
+    def parse_products(self, response, div, subdiv):
+        product_names = response.css("a.product-name::text").getall()
+        product_names = [name.split(" - ")[-1].strip() for name in product_names]
         product_links = response.css("a.product-name::attr(href)").getall()
         product_links = [
             "https://sweets.construction.com" + url for url in product_links
         ]
-        for url in product_links:
-            yield scrapy.Request(url, callback=self.parse_item)
+        products = dict(zip(product_names, product_links))
 
-    def parse_item(self, response):
+        for name, url in products.items():
+            yield scrapy.Request(
+                url,
+                callback=self.parse_item,
+                cb_kwargs=dict(div=div, subdiv=subdiv, product=name),
+            )
+
+    def parse_item(self, response, div, subdiv, product):
         manufacturer = response.css("div.productInfo span.company-name::text").get()
-        manufacturer = manufacturer[:-3]
-        name = response.css("div.productInfo > h1.product-name::text").get()
-        # TODO: Scrape description cleanly
+        manufacturer = manufacturer[:-2]
+        manufacturer_url = response.css("a.locate_dis::attr(href)").get()
         overview = response.css("div.prd-overview > p:nth-child(1)::text").get()
-        # TODO: Scrape downloadable files
+        url = response.request.url
+        image = response.xpath("//*[@class='item active srle']/img/@src").get()
+        product_page = response.css("p.manufacturerLink > a::attr(href)").get()
+
+        # Optional full description, recommend leaving this out to prevent bloating
+        description = " ".join(
+            response.css("#overviewContent > p::text").getall()
+        ).strip()
+
+        yield {
+            "division": div,
+            "subdivision": subdiv,
+            "manufacturer": manufacturer,
+            "manufacturer_url": manufacturer_url,
+            "name": product,
+            "product_page": product_page,
+            "image": image,
+            "url": url,
+            "overview": overview,
+        }
