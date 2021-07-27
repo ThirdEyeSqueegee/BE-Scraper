@@ -89,7 +89,7 @@ class SpecSpider(scrapy.Spider):
         if len(vendors) == 0:
             vendor_dict = f_vendor_dict
         else:
-            vendor_dict |= f_vendor_dict
+            vendor_dict = vendor_dict | f_vendor_dict
 
         # yield a dict in the final format that will be saved to a JSON file
         yield {
