@@ -22,7 +22,7 @@ class SpecSpider(scrapy.Spider):
     def parse_items(self, response, item_url):
         # Select the contents of an <h1> tag -- the ID and name of the item
         item = response.css("div.listings > h1::text").get().split(" - ")
-        item_number = item[0]
+        item_number = item[0].replace(" ", "")
         item_name = item[1]
         # Select the text of all <a> tags -- the name of the company that sells the item
         vendors = response.css("div.listings > ul > li > a::text").getall()
@@ -93,7 +93,7 @@ class SpecSpider(scrapy.Spider):
 
         # yield a dict in the final format that will be saved to a JSON file
         yield {
-            "itemNumber": item_number,
+            "CSInumber": item_number,
             "itemName": item_name,
             "itemURL": item_url,
             "vendors": vendor_dict,
@@ -123,17 +123,23 @@ class SweetsSpider(scrapy.Spider):
 
     def parse_subdivisions(self, response, div):
         subdiv_names = response.css("td.col-1 > a::text").getall()
-        subdiv_names = [name[11:] for name in subdiv_names]
+        subdiv_numbers = [
+            name.split(" - ")[0].replace(" ", "") for name in subdiv_names
+        ]
+        subdiv_names = [name.split(" - ")[-1].strip() for name in subdiv_names]
+        subdivs = list(zip(subdiv_numbers, subdiv_names))
         subdiv_links = response.css("td.col-1 > a::attr(href)").getall()
         subdiv_links = ["https://sweets.construction.com" + url for url in subdiv_links]
-        subdivs = dict(zip(subdiv_names, subdiv_links))
+        subdivs_dict = dict(zip(subdivs, subdiv_links))
 
-        for name, url in subdivs.items():
+        for subdiv, url in subdivs_dict.items():
             yield scrapy.Request(
-                url, callback=self.parse_products, cb_kwargs=dict(div=div, subdiv=name)
+                url,
+                callback=self.parse_products,
+                cb_kwargs=dict(div=div, csi=subdiv[0], subdiv=subdiv[1]),
             )
 
-    def parse_products(self, response, div, subdiv):
+    def parse_products(self, response, div, csi, subdiv):
         product_names = response.css("a.product-name::text").getall()
         product_names = [name.split(" - ")[-1].strip() for name in product_names]
         product_links = response.css("a.product-name::attr(href)").getall()
@@ -146,10 +152,10 @@ class SweetsSpider(scrapy.Spider):
             yield scrapy.Request(
                 url,
                 callback=self.parse_item,
-                cb_kwargs=dict(div=div, subdiv=subdiv, product=name),
+                cb_kwargs=dict(div=div, csi=csi, subdiv=subdiv, product=name),
             )
 
-    def parse_item(self, response, div, subdiv, product):
+    def parse_item(self, response, div, csi, subdiv, product):
         manufacturer = response.css("div.productInfo span.company-name::text").get()
         manufacturer = manufacturer[:-2]
         manufacturer_url = response.css("a.locate_dis::attr(href)").get()
@@ -169,6 +175,7 @@ class SweetsSpider(scrapy.Spider):
             "manufacturer": manufacturer,
             "manufacturer_url": manufacturer_url,
             "name": product,
+            "CSInumber": csi,
             "product_page": product_page,
             "image": image,
             "url": url,
