@@ -143,6 +143,9 @@ class SweetsSpider(scrapy.Spider):
     def parse_products(self, response, div, csi, subdiv):
         product_names = response.css("a.product-name::text").getall()
         product_names = [name.split(" - ")[-1].strip() for name in product_names]
+        product_names = [
+            name.encode("ascii", "ignore").decode() for name in product_names
+        ]
         product_links = response.css("a.product-name::attr(href)").getall()
         product_links = [
             "https://sweets.construction.com" + url for url in product_links
@@ -161,6 +164,7 @@ class SweetsSpider(scrapy.Spider):
         manufacturer = manufacturer[:-2]
         manufacturer_url = response.css("a.locate_dis::attr(href)").get()
         overview = response.css("div.prd-overview > p:nth-child(1)::text").get()
+        overview = overview.encode("ascii", "ignore").decode()
         url = response.request.url
         image = response.xpath("//*[@class='item active srle']/img/@src").get()
         product_page = response.css("p.manufacturerLink > a::attr(href)").get()
