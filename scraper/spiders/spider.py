@@ -1,4 +1,5 @@
 import scrapy
+from urllib import parse
 
 
 class SpecSpider(scrapy.Spider):
@@ -93,9 +94,9 @@ class SpecSpider(scrapy.Spider):
 
         # yield a dict in the final format that will be saved to a JSON file
         yield {
-            "CSInumber": item_number,
-            "itemName": item_name,
-            "itemURL": item_url,
+            "csi_number": item_number,
+            "item_name": item_name,
+            "item_url": item_url,
             "vendors": vendor_dict,
         }
 
@@ -164,6 +165,10 @@ class SweetsSpider(scrapy.Spider):
         image = response.xpath("//*[@class='item active srle']/img/@src").get()
         product_page = response.css("p.manufacturerLink > a::attr(href)").get()
 
+        if product_page[:15] == "/AdditionalInfo":
+            product_page = product_page[16:]
+            product_page = parse.unquote(product_page)
+
         # Optional full description, recommend leaving this out to prevent bloating
         description = " ".join(
             response.css("#overviewContent > p::text").getall()
@@ -175,7 +180,7 @@ class SweetsSpider(scrapy.Spider):
             "manufacturer": manufacturer,
             "manufacturer_url": manufacturer_url,
             "name": product,
-            "CSInumber": csi,
+            "csi_number": csi,
             "product_page": product_page,
             "image": image,
             "url": url,
