@@ -164,7 +164,7 @@ class SweetsSpider(scrapy.Spider):
         manufacturer = manufacturer[:-2]
         manufacturer_url = response.css("a.locate_dis::attr(href)").get()
         overview = response.css("div.prd-overview > p:nth-child(1)::text").get()
-        overview = overview.encode("ascii", "ignore").decode()
+        overview = overview.encode("ascii", "ignore").decode().strip()
         url = response.request.url
         image = response.xpath("//*[@class='item active srle']/img/@src").get()
         product_page = response.css("p.manufacturerLink > a::attr(href)").get()
