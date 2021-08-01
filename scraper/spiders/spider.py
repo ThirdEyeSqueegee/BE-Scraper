@@ -41,7 +41,11 @@ class SpecSpider(scrapy.Spider):
             ).getall()
             vendor_desc = response.css("div.listings > ul > li::text").getall()
             vendor_desc = [s for s in vendor_desc if s != "" and s != " " and s != "\n"]
-            vendor_desc = [desc[3:] for desc in vendor_desc if desc[1] == "-"]
+            vendor_desc = [
+                desc[3:].encode("ascii", "ignore").decode().strip()
+                for desc in vendor_desc
+                if desc[1] == "-"
+            ]
             vendor_values = [
                 {"URL": url, "desc": None, "image": None} for url in vendor_links
             ]
