@@ -1,4 +1,5 @@
 import scrapy
+import re
 from urllib import parse
 
 
@@ -194,4 +195,72 @@ class SweetsSpider(scrapy.Spider):
             "image": image,
             "url": url,
             "overview": overview,
+        }
+
+
+class BuildsiteSpider(scrapy.Spider):
+    name = "buildsite_spider"
+    allowed_domains = ["buildsite.com"]
+    start_urls = ["https://www.buildsite.com"]
+
+    def parse(self, response):
+        categories = "https://www.buildsite.com/masterformat"
+        yield scrapy.Request(categories, callback=self.parse_masterformat)
+
+    def parse_masterformat(self, response):
+        categories = response.xpath("//td[@class='number hidden-xs']/a/@href").getall()
+        for url in categories:
+            yield scrapy.Request(url, callback=self.parse_category)
+
+    def parse_category(self, response):
+        products = response.xpath(
+            "//div[@class='list-item__column tooltip-anchor']/strong/a/@href"
+        ).getall()
+        for url in products:
+            yield scrapy.Request(url, callback=self.parse_product)
+
+    def parse_product(self, response):
+        name = response.xpath("//h1[@class='b-features__headline']/text()").get()
+        name = name.encode("ascii", "ignore").decode().strip()
+
+        cols = response.xpath("//div[@class='b-features']/div[@class='columns']")
+        d = {}
+        for col in cols:
+            left = col.xpath("//div[@class='column__left']/span/text()").get()
+            right = col.xpath("//div[@class='column__right']/a/text()").get()
+            d.update({left: right})
+
+        d.pop("Features", None)
+
+        category = d["Category"]
+        csi_number = category[category.rfind("(") + 1 : -1].replace(" ", "")
+        category = category[: category.rfind("(") - 1].strip()
+        category = category.split(" - ")
+        url = response.request.url
+        manufacturer = response.xpath(
+            "//div[@class='manufacturer-info__description']/a/strong/text()"
+        ).get()
+        manufacturer_url = response.xpath(
+            "//div[@class='manufacturer-info__contacts']/ul/li[3]/a/@href"
+        ).get()
+        document_names = response.xpath(
+            "//div[@id='product_documents']/ul/li/div[@class='document-description']/a/text()"
+        ).getall()
+        document_links = response.xpath(
+            "//div[@id='product_documents']/ul/li/div[@class='document-description']/a/@href"
+        ).getall()
+        documents = dict(zip(document_names, document_links))
+        description = d.get("Description")
+        standards = d.get("Standards")
+
+        yield {
+            "name": name,
+            "description": description,
+            "category": category,
+            "csi_number": csi_number,
+            "url": url,
+            "manufacturer": manufacturer,
+            "manufacturer_url": manufacturer_url,
+            "documents": documents,
+            "standards": standards,
         }
