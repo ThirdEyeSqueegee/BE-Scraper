@@ -222,20 +222,32 @@ class BuildsiteSpider(scrapy.Spider):
     def parse_product(self, response):
         name = response.xpath("//h1[@class='b-features__headline']/text()").get()
         name = name.encode("ascii", "ignore").decode().strip()
-
         cols = response.xpath("//div[@class='b-features']/div[@class='columns']")
-        d = {}
-        for col in cols:
-            left = col.xpath("//div[@class='column__left']/span/text()").get()
-            right = col.xpath("//div[@class='column__right']/a/text()").get()
-            d.update({left: right})
 
+        left = cols.xpath("//div[@class='column__left']/span/text()").getall()
+        right = cols.xpath("//div[@class='column__right']")
+        d = dict(zip(left, right))
         d.pop("Features", None)
+        d.pop("Standards", None)
+        d["Category"] = d["Category"].xpath("./a/text()").get()
+
+        if d.get("Description") != None:
+            d["Description"] = (
+                d["Description"]
+                .xpath("./div[@class='b-list-style']/text()")
+                .get()
+                .strip()
+                .encode("ascii", "ignore")
+                .decode()
+            )
 
         category = d["Category"]
-        csi_number = category[category.rfind("(") + 1 : -1].replace(" ", "")
-        category = category[: category.rfind("(") - 1].strip()
-        category = category.split(" - ")
+
+        if category != None:
+            csi_number = category[category.rfind("(") + 1 : -1].replace(" ", "")
+            category = category[: category.rfind("(") - 1].strip()
+            category = category.split(" - ")
+
         url = response.request.url
         manufacturer = response.xpath(
             "//div[@class='manufacturer-info__description']/a/strong/text()"

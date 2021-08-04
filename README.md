@@ -8,3 +8,4 @@
 
 -   4specs_spider
 -   sweets_spider
+-   buildsite_spider
