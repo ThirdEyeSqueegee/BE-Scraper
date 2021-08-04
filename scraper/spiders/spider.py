@@ -267,7 +267,7 @@ class BuildsiteSpider(scrapy.Spider):
 
         yield {
             "name": name,
-            "description": description,
+            "overview": description,
             "category": category,
             "csi_number": csi_number,
             "url": url,
